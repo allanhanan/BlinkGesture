@@ -276,11 +276,21 @@ def show_window(icon, item):
 
 #ok tis aint working idk why please send help
 def quit_app(icon=None, item=None):
-    global running
+    global running, capture_thread, cap
     running = False
+    #wait for the capture thread to finish
+    if capture_thread is not None:
+        capture_thread.join()
+
+    with cap_lock:
+        if cap is not None:
+            cap.release()
+    cv2.destroyAllWindows()
     save_settings()
+
     if icon:
         icon.stop()
+    root.quit()
     root.destroy()
     sys.exit()
 
@@ -289,7 +299,7 @@ load_settings()
 
 #GUI pain
 root = tk.Tk()
-root.title("Blink Gesture Control")
+root.title("BlinkGesture")
 
 #start button
 start_button = ttk.Button(root, text="Start", command=lambda: start_processing(False))
@@ -367,7 +377,7 @@ def start_default_camera():
 #why am i commenting this
 start_default_camera()
 
-root.protocol("WM_DELETE_WINDOW", minimize_to_tray)
+root.protocol("WM_DELETE_WINDOW", lambda: quit_app(None, None))
 root.bind("<Unmap>", lambda event: minimize_to_tray() if root.state() == 'iconic' else None)
 
 root.mainloop()
