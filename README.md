@@ -9,4 +9,4 @@ Press 'Stop' to close these windows.
 Adjust the consecutive frames for more precise double blink detection.
 Customize keyboard shortcuts and choose actions that suit your needs. Ex: alt+tab, ctrl+win+right arrow, or just space if you're too lazy to pause the video like me 
 
-### The App only recogonizes the **Default Camera** of your Device for now
+### The App NO LONGER! only recogonizes the **Default Camera** of your Device
