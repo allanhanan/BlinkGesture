@@ -1,0 +1,9 @@
+opencv-python
+dlib
+numpy
+scipy
+matplotlib
+pyautogui
+Pillow
+pystray
+
