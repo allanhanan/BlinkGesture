@@ -1,3 +1,4 @@
+import sys
 import cv2
 import dlib
 import numpy as np
@@ -9,19 +10,14 @@ import time
 import queue
 import tkinter as tk
 from tkinter import ttk, Scale, Entry
-import keyboard
+import pyautogui
 from PIL import Image, ImageDraw
 import pystray
 import sys
 import json
-from pygrabber.dshow_graph import FilterGraph
-from comtypes import stream
-
-#init face detectors
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor("./shape_predictor_68_face_landmarks.dat")
 
 #consts
+SCRIPT_DIR = __file__.rsplit('/', 1)[0]
 EYE_AR_THRESH = 0.25
 EYE_AR_CONSEC_FRAMES = 1
 DOUBLE_BLINK_INTERVAL = 0.6
@@ -29,6 +25,13 @@ COUNTER = 0
 TOTAL = 0
 DOUBLE_BLINK_COUNT = 0
 blink_times = []
+PLATID = 1 if sys.platform.startswith('win') else 0 #platform check
+
+
+#init face detectors
+detector = dlib.get_frontal_face_detector()
+predictor = dlib.shape_predictor(f"{SCRIPT_DIR}/shape_predictor_68_face_landmarks.dat")
+
 
 #frame res
 FRAME_WIDTH = 420
@@ -60,9 +63,28 @@ xdata, ydata = [], []
 frame_window_open = False
 
 
+#platform specific get camera
 def get_camera_list():
-    graph = FilterGraph()
-    return graph.get_input_devices()
+    if PLATID == 1:
+        from pygrabber.dshow_graph import FilterGraph
+        from comtypes import stream
+        graph = FilterGraph()
+        return graph.get_input_devices()
+    
+    else:      #everything else other than windows
+        import subprocess
+        result = subprocess.run(['v4l2-ctl', '--list-devices'], stdout=subprocess.PIPE)
+        output = result.stdout.decode().split('\n')
+        cameras = []
+        current_camera = None
+        for line in output:
+            if not line.startswith('\t'):
+                current_camera = line.strip()
+            elif current_camera:
+                cameras.append(current_camera)
+                current_camera = None
+                return cameras
+
 
 #capture frame
 def capture_frame(camera_index):
@@ -112,6 +134,14 @@ def eye_aspect_ratio(eye):
     ear = (A + B) / (2.0 * C)
     return ear
 
+def key_press(key_string):
+    keys = key_string.lower().split('+')
+
+    try: #directly use the keys as they are 
+        pyautogui.hotkey(*keys) 
+    except Exception as e: 
+        print(f"Error: {e}")
+
 #why am i commenting alla this?
 def process_frame(frame, gray):
     global COUNTER, TOTAL, DOUBLE_BLINK_COUNT, ear, blink_times, command
@@ -148,7 +178,7 @@ def process_frame(frame, gray):
                 blink_times.append(time.time())
                 if len(blink_times) >= 2 and (blink_times[-1] - blink_times[-2]) <= DOUBLE_BLINK_INTERVAL:
                     DOUBLE_BLINK_COUNT += 1
-                    keyboard.press_and_release(command)
+                    key_press(command)
             COUNTER = 0
 
         #puts text (no shit sherlock)
@@ -183,6 +213,7 @@ def update(frame_num):
 
         if frame_window_open:
             cv2.imshow("Frame", processed_frame)
+            cv2.waitKey(1)
 
     return ln, threshold_line
 
@@ -263,7 +294,7 @@ def create_menu():
 
 #gotta do what you gotta do
 def minimize_to_tray():
-    image = Image.open("./icon.ico")
+    image = Image.open(f"{SCRIPT_DIR}/icon.ico")
     menu = create_menu()
     icon = pystray.Icon("Blink Gesture", image, "Blink Gesture", menu)
     root.withdraw()
@@ -276,21 +307,11 @@ def show_window(icon, item):
 
 #ok tis aint working idk why please send help
 def quit_app(icon=None, item=None):
-    global running, capture_thread, cap
+    global running
     running = False
-    #wait for the capture thread to finish
-    if capture_thread is not None:
-        capture_thread.join()
-
-    with cap_lock:
-        if cap is not None:
-            cap.release()
-    cv2.destroyAllWindows()
     save_settings()
-
     if icon:
         icon.stop()
-    root.quit()
     root.destroy()
     sys.exit()
 
@@ -299,7 +320,7 @@ load_settings()
 
 #GUI pain
 root = tk.Tk()
-root.title("BlinkGesture")
+root.title("Blink Gesture Control")
 
 #start button
 start_button = ttk.Button(root, text="Start", command=lambda: start_processing(False))
@@ -377,7 +398,7 @@ def start_default_camera():
 #why am i commenting this
 start_default_camera()
 
-root.protocol("WM_DELETE_WINDOW", lambda: quit_app(None, None))
+root.protocol("WM_DELETE_WINDOW", minimize_to_tray)
 root.bind("<Unmap>", lambda event: minimize_to_tray() if root.state() == 'iconic' else None)
 
 root.mainloop()
