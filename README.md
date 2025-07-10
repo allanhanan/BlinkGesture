@@ -1,2 +1,2 @@
 # BlinkGesture
-Coming soon with CNN based detection
+Came not so soon with CNN based detection
